@@ -1,27 +1,47 @@
-from flask import Flask, render_template, request, jsonify
-import os
-import sqlite3
-import hashlib
+from flask import Flask, render_template, jsonify
+from datetime import datetime
 from config.database import get_db_connection
 from config.settings import FLASK_CONFIG
 
+# =====================================
+# Flask App Initialization
+# =====================================
 app = Flask(__name__)
-app.config.update(FLASK_CONFIG)
+app.config.from_mapping(FLASK_CONFIG)
 
-@app.route('/')
+# =====================================
+# Routes
+# =====================================
+@app.route("/")
 def index():
-    return render_template('index.html')
+    """Render the main page."""
+    return render_template("index.html")
 
-@app.route('/api/users')
+
+@app.route("/api/users", methods=["GET"])
 def get_users():
-    conn = get_db_connection()
-    users = conn.execute('SELECT id, username, email FROM users').fetchall()
-    conn.close()
+    """Fetch all users from the database."""
+    with get_db_connection() as conn:
+        users = conn.execute(
+            "SELECT id, username, email FROM users"
+        ).fetchall()
     return jsonify([dict(user) for user in users])
 
-@app.route('/health')
-def health_check():
-    return {'status': 'healthy', 'timestamp': str(datetime.now())}
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Return service health status."""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    })
+
+# =====================================
+# Main Entry Point
+# =====================================
+if __name__ == "__main__":
+    app.run(
+        debug=app.config.get("DEBUG", False),
+        host=app.config.get("HOST", "0.0.0.0"),
+        port=app.config.get("PORT", 5000)
+    )

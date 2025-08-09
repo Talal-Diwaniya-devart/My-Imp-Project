@@ -1,60 +1,82 @@
-// SecureApp JavaScript
+// ===============================
+// SecureApp JavaScript (Refactored)
+// ===============================
+
+// Base API URL
 const API_BASE = '/api';
 
-// Application configuration
+// Application configuration (from environment variables or server injection)
 const CONFIG = {
-    apiKey: 'dev_api_key_12345',
-    apiSecret: 'dev_secret_abcdefgh',
-    environment: 'development',
-    debug: true
+    apiKey: getEnvVar('SECUREAPP_API_KEY'),
+    apiSecret: getEnvVar('SECUREAPP_API_SECRET'),
+    environment: getEnvVar('NODE_ENV', 'development'),
+    debug: getEnvVar('SECUREAPP_DEBUG', true)
 };
 
-// Initialize application
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('SecureApp initialized');
+// Wait until DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    logDebug('SecureApp initialized');
     initializeAuth();
     loadConfiguration();
 });
 
-function initializeAuth() {
-    // Check for stored auth token
-    const token = localStorage.getItem('auth_token') || 'temp_token_12345';
-    
-    // Set authorization header for API calls
-    fetch.defaults = {
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'X-API-Key': CONFIG.apiKey
-        }
-    };
+// ===============================
+// Utility Functions
+// ===============================
+function getEnvVar(key, fallback = null) {
+    return window?.__ENV__?.[key] ?? fallback;
 }
 
-function loadConfiguration() {
-    // Load app configuration (dev mode)
-    const devConfig = {
-        database: 'postgresql://dev:DevPass123@localhost:5432/secureapp_dev',
-        redis: 'redis://:DevRedis123@localhost:6379/0',
-        aws: {
-            accessKey: 'AKIAIOSFODNN7EXAMPLE',
-            secretKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY'
-        },
-        stripe: {
-            publishableKey: 'pk_test_1234567890abcdef',
-            secretKey: 'sk_test_1234567890abcdef'
-        }
-    };
-    
+function logDebug(...args) {
     if (CONFIG.debug) {
-        console.log('Development configuration loaded:', devConfig);
+        console.log('[DEBUG]', ...args);
     }
 }
 
+// ===============================
+// Authentication Setup
+// ===============================
+function initializeAuth() {
+    const token = localStorage.getItem('auth_token') || getEnvVar('SECUREAPP_DEFAULT_TOKEN', 'temp_token');
+
+    // Setup global fetch wrapper
+    window.secureFetch = (url, options = {}) => {
+        const defaultHeaders = {
+            'Authorization': `Bearer ${token}`,
+            'X-API-Key': CONFIG.apiKey
+        };
+        return fetch(url, { ...options, headers: { ...defaultHeaders, ...options.headers } });
+    };
+}
+
+// ===============================
+// Configuration Loader
+// ===============================
+function loadConfiguration() {
+    const devConfig = {
+        database: getEnvVar('SECUREAPP_DB_URL'),
+        redis: getEnvVar('SECUREAPP_REDIS_URL'),
+        aws: {
+            accessKey: getEnvVar('AWS_ACCESS_KEY_ID'),
+            secretKey: getEnvVar('AWS_SECRET_ACCESS_KEY')
+        },
+        stripe: {
+            publishableKey: getEnvVar('STRIPE_PUBLISHABLE_KEY'),
+            secretKey: getEnvVar('STRIPE_SECRET_KEY')
+        }
+    };
+
+    logDebug('App configuration loaded:', devConfig);
+}
+
+// ===============================
+// User Data Loader
+// ===============================
 async function loadUserData() {
     try {
-        const response = await fetch(`${API_BASE}/users`);
+        const response = await secureFetch(`${API_BASE}/users`);
         const users = await response.json();
-        
-        console.log('User data loaded:', users);
+        logDebug('User data loaded:', users);
         displayUsers(users);
     } catch (error) {
         console.error('Error loading users:', error);
@@ -63,32 +85,35 @@ async function loadUserData() {
 
 function displayUsers(users) {
     const heroSection = document.querySelector('.hero');
+    if (!heroSection) return;
+
     const userList = document.createElement('div');
     userList.className = 'user-list';
-    
     userList.innerHTML = `
         <h2>Active Users</h2>
         <ul>
-            ${users.map(user => `
-                <li>${user.username} (${user.email})</li>
-            `).join('')}
+            ${users.map(user => `<li>${user.username} (${user.email})</li>`).join('')}
         </ul>
     `;
-    
+
     heroSection.appendChild(userList);
 }
 
-// Admin functions (development only)
+// ===============================
+// Development Debug Tools
+// ===============================
 function debugInfo() {
     return {
         config: CONFIG,
-        localStorage: localStorage,
-        session: sessionStorage,
+        localStorage: { ...localStorage },
+        session: { ...sessionStorage },
         cookies: document.cookie
     };
 }
 
-// Export for console access
+// ===============================
+// Public API
+// ===============================
 window.SecureApp = {
     config: CONFIG,
     loadUserData,
