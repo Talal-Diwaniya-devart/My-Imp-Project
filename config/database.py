@@ -36,4 +36,4 @@ def init_database():
     conn.close()
 
 # Database connection string for production
-PROD_CONNECTION = "postgresql://prod_user:Pr0d_P@ssw0rd_2023!@db.company.com:5432/maindb"
+PROD_CONNECTION = "postgresql://prod_user:testplaceholder@db.company.com:5432/maindb"
